@@ -103,8 +103,12 @@ select option,select optgroup{background:var(--surface);color:var(--text)}
 
 .banner{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
 .banner h1{margin:0;font-size:36px;line-height:42px;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
-.formula{display:grid;grid-auto-flow:column;grid-template-rows:auto auto;gap:2px 14px;font:500 15px/22px var(--font-mono);font-variant-numeric:tabular-nums}
+.formula{display:grid;grid-auto-flow:column;grid-template-rows:auto auto auto;gap:2px 14px;font:500 15px/22px var(--font-mono);font-variant-numeric:tabular-nums;max-width:100%;overflow-x:auto;justify-items:center}
 .formula .deg{color:var(--text-muted);font-size:13px;line-height:18px}
+.formula .gap{color:var(--primary);font-size:13px;line-height:18px}
+.formula .rowlab{justify-self:start;font:500 11px/22px var(--font-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.formula .rowlab+.rowlab{line-height:18px}
+.formula .oct{opacity:.6}
 
 .toolbar{display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px 28px}
 #posField{min-width:min(100%,24rem)}
@@ -458,8 +462,8 @@ function renderControls(){
   }
   $('scale').value=st.scale;
   seg($('view'),[['neck','Whole neck'],['box','Box positions']],st.view,v=>{
-    st.view=v; if(v==='box'&&st.labels==='notes') st.labels='fingers'; if(v==='neck'&&st.labels==='fingers') st.labels='notes'; update();});
-  const lab=st.view==='box'?[['fingers','Fingers'],['notes','Notes'],['degrees','Degrees'],['blank','Blank']]:[['notes','Notes'],['degrees','Degrees'],['blank','Blank']];
+    st.view=v; if(v==='box'&&st.labels==='notes') st.labels='fingers'; if(v==='neck'&&(st.labels==='fingers'||st.labels==='order')) st.labels='notes'; update();});
+  const lab=st.view==='box'?[['fingers','Fingers'],['order','Play order'],['notes','Notes'],['blank','Blank'],['degrees','Degrees']]:[['notes','Notes'],['blank','Blank'],['degrees','Degrees']];
   seg($('labels'),lab,st.labels,v=>{st.labels=v;update();});
   $('fretField').hidden=st.view==='box';
   seg($('frets'),[[12,'0–12'],[24,'0–24']],st.frets,v=>{st.frets=v;update();});
@@ -515,10 +519,15 @@ function renderBoard(){
   else o.push(spk(HL-50,4)+`<text class="tunehead" x="${HL-35}" y="10" dominant-baseline="middle">Tune</text>`);
   const inScale=pc=>s.iv.some(v=>(st.root+v)%12===pc);
   const ivOf=pc=>((pc-st.root)%12+12)%12;
+  /* play order: every note in the box numbered from its lowest pitch to its highest */
+  const orderMap={};
+  if(box){const ps=[...new Set(box.notes.map(n=>tun[n.i]+n.f))].sort((a,b)=>a-b);
+    box.notes.forEach(n=>{orderMap[n.i+':'+n.f]=ps.indexOf(tun[n.i]+n.f)+1;});}
   const labelFor=n=>{
     if(st.labels==='blank') return '';
     if(st.labels==='degrees') return degLabel(ivOf(n.pc));
     if(st.labels==='fingers') return n.finger||'';
+    if(st.labels==='order') return String(orderMap[n.i+':'+n.f]||'');
     return noteName(n.pc);
   };
   const drawNote=(n,ghost)=>{
@@ -565,14 +574,18 @@ function renderBoard(){
     `<span><svg class="speaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>Tap a string name to hear its tuning pitch</span>`;
   $('method').textContent=box
     ? (box.N===0?'This instrument uses one-finger-per-fret windows: one position starts on each scale note of the lowest string, and each finger covers one fret.':box.N===3?'Seven-note scales use the three-notes-per-string system: one position starts on each scale degree of the lowest string.':'Pentatonic scales use two-notes-per-string boxes: one position starts on each scale note of the lowest string.')
-      +' Finger numbers are a common default, not a rule; change them if your hand prefers a different stretch.'
+      +' Finger numbers are a common default, not a rule; change them if your hand prefers a different stretch.'+(st.labels==='order'?' Play order numbers the box from its lowest note to its highest: play 1, 2, 3… up, then back down.':'')
     : 'Every note of the scale across the neck. Switch to Box positions to learn it one shape at a time.';
 }
 
 function renderBanner(){
   const s=SC[st.scale];
   $('title').textContent=`${rootName()} ${s.short}`;
-  $('formula').innerHTML=s.iv.map(v=>`<span>${noteName(st.root+v)}</span><span class="deg">${degLabel(v)}</span>`).join('');
+  /* scale spelling plus the step pattern in frets, ending back on the root an octave up */
+  const cols=s.iv.map((v,i)=>({n:noteName(st.root+v),d:degLabel(v),g:i===0?'–':'+'+(v-s.iv[i-1])}));
+  cols.push({n:rootName(),d:'R',g:'+'+(12-s.iv[s.iv.length-1]),oct:true});
+  $('formula').innerHTML='<span class="rowlab">Notes</span><span class="rowlab">Degree</span><span class="rowlab" title="Frets from the previous note">Frets</span>'+
+    cols.map(c=>`<span class="${c.oct?'oct':''}">${c.n}</span><span class="deg${c.oct?' oct':''}">${c.d}</span><span class="gap" title="Frets from the previous note">${c.g}</span>`).join('');
 }
 
 /* reference tones: exact-pitch plucked tone per open string */
