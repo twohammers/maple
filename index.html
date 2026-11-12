@@ -72,6 +72,7 @@ main.wrap{display:flex;flex-direction:column;gap:24px;padding-block:8px 48px}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:20px;display:grid;grid-template-columns:1fr;gap:20px}
 .field{display:flex;flex-direction:column;gap:8px;min-width:0}
 .field.wide{grid-column:1/-1}
+.instrow{display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px 28px}
 .label{font-size:12px;line-height:16px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);font-weight:500}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 
@@ -178,9 +179,15 @@ kbd{font:500 12px var(--font-mono);border:1px solid var(--border);border-radius:
 
 <main class="wrap">
   <section class="panel" aria-label="Instrument and scale">
-    <div class="field">
-      <span class="label" id="instLabel">Instrument</span>
-      <div class="seg" id="inst" role="group" aria-labelledby="instLabel"></div>
+    <div class="instrow">
+      <div class="field">
+        <span class="label" id="instLabel">Instrument</span>
+        <div class="seg" id="inst" role="group" aria-labelledby="instLabel"></div>
+      </div>
+      <div class="field" id="strField">
+        <span class="label" id="strLabel">Strings</span>
+        <div class="seg" id="strings" role="group" aria-labelledby="strLabel"></div>
+      </div>
     </div>
     <div class="field">
       <label class="label" for="tuning">Tuning</label>
@@ -242,8 +249,10 @@ kbd{font:500 12px var(--font-mono);border:1px solid var(--border);border-radius:
 const SHARP=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const FLAT =['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
 const INST={
-  bass:{label:'Bass',uke:false,tunings:[
-    ['Standard',[28,33,38,43]],['Drop D',[26,33,38,43]],['D Standard',[26,31,36,41]],['5-string',[23,28,33,38,43]]]},
+  b4:{label:'4-string bass',uke:false,tunings:[
+    ['Standard',[28,33,38,43]],['E♭ Standard',[27,32,37,42],'flat'],['Drop D',[26,33,38,43]],['D Standard',[26,31,36,41]],['Drop C',[24,31,36,41]]]},
+  b5:{label:'5-string bass',uke:false,tunings:[
+    ['Standard',[23,28,33,38,43]],['B♭ Standard',[22,27,32,37,42],'flat'],['Drop A',[21,28,33,38,43]],['High C',[28,33,38,43,48]]]},
   g6:{label:'6-string',uke:false,tunings:[
     ['Standard',[40,45,50,55,59,64]],['E♭ Standard',[39,44,49,54,58,63],'flat'],['Drop D',[38,45,50,55,59,64]],
     ['Drop C♯',[37,44,49,54,58,63]],['D Standard',[38,43,48,53,57,62]],['Drop C',[36,43,48,53,57,62]],
@@ -256,6 +265,9 @@ const INST={
   uke:{label:'Uke',uke:true,tunings:[
     ['Standard (high G)',[67,60,64,69]],['Low G',[55,60,64,69]],['Baritone',[50,55,59,64]],['D tuning',[69,62,66,71]]]}
 };
+/* instrument picker: family first, then string count */
+const FAMILY={guitar:{label:'Guitar',list:['g6','g7','g8']},bass:{label:'Bass',list:['b4','b5']},uke:{label:'Uke',list:['uke']}};
+const famOf=k=>Object.keys(FAMILY).find(f=>FAMILY[f].list.includes(k));
 const SCALES=[
   {id:'ionian',name:'Ionian (Major)',short:'Ionian',group:'Modes',iv:[0,2,4,5,7,9,11]},
   {id:'dorian',name:'Dorian',short:'Dorian',group:'Modes',iv:[0,2,3,5,7,9,10]},
@@ -273,7 +285,7 @@ const SCALES=[
 const SC=Object.fromEntries(SCALES.map(s=>[s.id,s]));
 
 let st={inst:'g6',tuning:0,custom:null,root:9,acc:'sharp',scale:'minpent',view:'neck',labels:'notes',frets:12,pos:-1};
-try{const s=JSON.parse(localStorage.getItem('scalefinder')||'null'); if(s&&INST[s.inst]&&SC[s.scale]) st=Object.assign(st,s);}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('scalefinder')||'null'); if(s&&s.inst==='bass'){s.inst=s.tuning===3?'b5':'b4';s.tuning=0;s.custom=null;} if(s&&INST[s.inst]&&SC[s.scale]) st=Object.assign(st,s);}catch(e){}
 function save(){try{localStorage.setItem('scalefinder',JSON.stringify(st))}catch(e){}}
 
 const $=id=>document.getElementById(id);
@@ -404,7 +416,11 @@ function buildTuning(){
   };
 }
 function renderControls(){
-  seg($('inst'),Object.entries(INST).map(([k,v])=>[k,v.label]),st.inst,v=>{st.inst=v;st.tuning=0;st.custom=null;st.pos=-1;buildTuning();update();});
+  const pickInst=k=>{if(k===st.inst)return;st.inst=k;st.tuning=0;st.custom=null;st.pos=-1;buildTuning();update();};
+  const fam=famOf(st.inst), F=FAMILY[fam];
+  seg($('inst'),Object.entries(FAMILY).map(([k,f])=>[k,f.label]),fam,v=>{if(v!==fam)pickInst(FAMILY[v].list[0]);});
+  $('strField').hidden=F.list.length<2;
+  seg($('strings'),F.list.map(k=>[k,String(INST[k].tunings[0][1].length)]),st.inst,pickInst);
   $('tuning').value=st.custom?'custom':String(st.tuning);
   const tun=tuning();
   $('tuningLetters').textContent=tun.map(m=>tName(m)).join(' ');
@@ -484,7 +500,7 @@ function renderBoard(){
     o.push(`<text class="fnum${inl[k]?' mark':''}" x="${fx}" y="${fy}" text-anchor="${vertical?'end':'middle'}" dominant-baseline="middle">${k}</text>`);
   }
   {const [x1,y1]=P(openW,0),[x2,y2]=P(openW,across);o.push(`<line class="nut" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`);}
-  const bass=st.inst==='bass';
+  const bass=famOf(st.inst)==='bass';
   tun.forEach((m,i)=>{
     const t=S>1?i/(S-1):0; const w=(bass?3.6:3)-(bass?1.6:2)*t;
     const [x1,y1]=P(6,cS(i)),[x2,y2]=P(along,cS(i));

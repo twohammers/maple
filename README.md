@@ -3,7 +3,7 @@
 A fretboard scale finder for self-taught players. Pick your instrument (bass, 6-, 7-, 8-string guitar or ukulele), your tuning and a scale, then read it off the neck as a whole-neck map or as box positions with finger numbers.
 
 ## Features
-- Bass, 6-, 7- and 8-string guitar, and ukulele, with common standard, drop and down-tuned presets plus custom tuning
+- Guitar (6, 7 or 8 strings), bass (4 or 5 strings) and ukulele, with common standard, drop and down-tuned presets plus custom tuning
 - All 12 roots with correct note spelling for each key (F major shows B♭, not A♯)
 - Modes, harmonic and melodic minor, pentatonics and blues
 - Whole-neck view and box positions (three-notes-per-string, pentatonic boxes, one-finger-per-fret on uke)
