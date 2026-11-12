@@ -15,3 +15,6 @@ A fretboard scale finder for self-taught players. Pick your instrument (bass, 6-
 It's a single static file. Open `index.html` in a browser, or host it on GitHub Pages, Netlify or Cloudflare Pages.
 
 Design decisions live in [DESIGN.md](DESIGN.md).
+
+## License
+Copyright (c) 2026 Derrick Chew. All rights reserved. See [LICENSE](LICENSE).
