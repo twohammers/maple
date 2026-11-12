@@ -463,7 +463,8 @@ function renderControls(){
   $('scale').value=st.scale;
   seg($('view'),[['neck','Whole neck'],['box','Box positions']],st.view,v=>{
     st.view=v; if(v==='box'&&st.labels==='notes') st.labels='fingers'; if(v==='neck'&&(st.labels==='fingers'||st.labels==='order')) st.labels='notes'; update();});
-  const lab=st.view==='box'?[['fingers','Fingers'],['order','Play order'],['notes','Notes'],['blank','Blank'],['degrees','Degrees']]:[['notes','Notes'],['blank','Blank'],['degrees','Degrees']];
+  if(st.labels==='blank') st.labels=st.view==='box'?'fingers':'notes';
+  const lab=st.view==='box'?[['fingers','Fingers'],['order','Play order'],['notes','Notes'],['degrees','Degrees']]:[['notes','Notes'],['degrees','Degrees']];
   seg($('labels'),lab,st.labels,v=>{st.labels=v;update();});
   $('fretField').hidden=st.view==='box';
   seg($('frets'),[[12,'0–12'],[24,'0–24']],st.frets,v=>{st.frets=v;update();});
