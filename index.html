@@ -361,6 +361,7 @@ function fingerString(frets){
   });
   return out;
 }
+const MAXF=22;
 function positions(){
   const tun=tuning(), s=SC[st.scale], base=s.box||s.iv, k=base.length, N=k>=7?3:2;
   const order=tun.map((m,i)=>i).sort((a,b)=>tun[a]-tun[b]);
@@ -384,7 +385,7 @@ function positions(){
       tun.forEach((m,si)=>{for(let fr=a;fr<=top;fr++){const q=(m+fr)%12;if(s.iv.includes(((q-st.root)%12+12)%12))
         notes.push({i:si,f:fr,pc:q,finger:fr===0?'O':String(a===0?Math.min(4,fr):Math.min(4,fr-a+1))});}});
       nz=notes.filter(n=>n.f>0).map(n=>n.f);
-      list.push({notes,lo:Math.min(...nz),hi:Math.max(...nz),N:0,start:base[p]});
+      list.push({notes,lo:Math.min(...nz),hi:Math.max(...nz),N:0,start:base[p],w:a});
       continue;
     }
     if(s.blue!==undefined){
@@ -398,8 +399,33 @@ function positions(){
     });
     list.push({notes,lo,hi,N,start:base[p]});
   }
+  /* repeat every box an octave (12 frets) up or down so the boxes cover the whole neck to fret 22,
+     then redo the fingering because a shifted box can gain or lose open strings */
+  const finish=b=>{
+    const nz=b.notes.filter(n=>n.f>0).map(n=>n.f);
+    b.lo=nz.length?Math.min(...nz):0; b.hi=nz.length?Math.max(...nz):0;
+    if(b.N===0) b.notes.forEach(n=>{n.finger=n.f===0?'O':String(b.w<=0?Math.min(4,n.f):Math.min(4,n.f-b.w+1));});
+    else if((b.notes.some(n=>n.f===0)?1:b.lo)+3>=b.hi){
+      /* box fits under the hand: one finger per fret (an open-string box sits at the 1st fret) */
+      const base=b.notes.some(n=>n.f===0)?1:b.lo;
+      b.notes.forEach(n=>{n.finger=n.f===0?'O':String(Math.min(4,Math.max(1,n.f-base+1)));});
+    }
+    else tun.forEach((m,si)=>{
+      const fs=b.notes.filter(n=>n.i===si), fg=fingerString(fs.filter(n=>!n.blue).map(n=>n.f));
+      fs.forEach(n=>{n.finger=n.blue?String(Math.min(4,Math.max(1,n.f-b.lo+1))):fg[n.f];});
+    });
+    return b;
+  };
+  const out=[], seen=new Set();
+  list.forEach(b=>{for(const sh of [-24,-12,0,12,24]){
+    const fs=b.notes.map(n=>n.f+sh);
+    if(Math.min(...fs)<0||Math.max(...fs)>MAXF) continue;
+    const c={N:b.N,start:b.start,w:(b.w||0)+sh,notes:b.notes.map(n=>Object.assign({},n,{f:n.f+sh}))};
+    const key=c.notes.map(n=>n.i+':'+n.f).sort().join(',');
+    if(seen.has(key)) continue; seen.add(key); out.push(finish(c));
+  }});
   /* number boxes by where they sit on the neck: Box 1 is closest to the nut */
-  return list.sort((a,b)=>a.lo-b.lo||a.hi-b.hi);
+  return out.sort((a,b)=>a.lo-b.lo||a.hi-b.hi);
 }
 
 /* ---------- controls ---------- */
@@ -477,7 +503,8 @@ function renderControls(){
   const lab=st.view==='box'?[['fingers','Fingers'],['order','Play order'],['notes','Notes'],['degrees','Degrees']]:[['notes','Notes'],['degrees','Degrees']];
   seg($('labels'),lab,st.labels,v=>{st.labels=v;update();});
   $('fretField').hidden=st.view==='box';
-  seg($('frets'),[[12,'0–12'],[24,'0–24']],st.frets,v=>{st.frets=v;update();});
+  if(st.frets!==12) st.frets=MAXF;
+  seg($('frets'),[[12,'0–12'],[MAXF,'0–'+MAXF]],st.frets,v=>{st.frets=v;update();});
 }
 
 /* ---------- board ---------- */
@@ -492,7 +519,7 @@ function renderBoard(){
     if(st.pos<0||st.pos>=pos.length){let b=0;pos.forEach((p,i)=>{if(p.lo<pos[b].lo)b=i;});st.pos=b;}
     box=pos[st.pos];
   }
-  const maxF=box?Math.min(24,Math.max(12,box.hi+2)):st.frets;
+  const maxF=box?MAXF:st.frets;
   const fw=vertical?46:58, sg=vertical?36:34, pad=20, openW=vertical?42:46;
   const along=openW+maxF*fw, across=pad*2+(S-1)*sg;
   const HL=56, HT=26, VL=34, VT=30;
@@ -575,7 +602,9 @@ function renderBoard(){
 
   $('posField').hidden=!box;
   if(box){
-    seg($('pos'),pos.map((p,i)=>[i,String(i+1)]),st.pos,v=>{st.pos=v;update();});
+    seg($('pos'),pos.map((p,i)=>[i,String(i+1)]),st.pos,v=>{st.pos=v;update();
+      /* on phones the neck runs down the page, so bring the chosen box into view */
+      if(mq.matches){const b=document.querySelector('#boardWrap .band');if(b&&b.scrollIntoView)b.scrollIntoView({block:'center',behavior:'smooth'});}});
     $('posCaption').textContent=(box.start===0?'Starts on the root':`Starts on ${degLabel(box.start,s.iv)}`)+` · frets ${box.lo}–${box.hi} · `+(box.N?`${box.N} notes per string${s.blue!==undefined?' + ♭5':''}`:'one finger per fret');
     if(!vertical){const wrap=$('boardWrap');const target=HL+openW+(box.lo-2)*fw;wrap.scrollLeft=Math.max(0,target);}
   }
