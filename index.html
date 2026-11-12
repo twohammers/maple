@@ -361,7 +361,9 @@ function fingerString(frets){
   });
   return out;
 }
-const MAXF=24;
+/* neck length: 24 frets for guitar and bass, 15 for ukulele (most ukes have 12–19) */
+const MAXF=24, UKEF=15;
+const neckF=()=>INST[st.inst].uke?UKEF:MAXF;
 function positions(){
   const tun=tuning(), s=SC[st.scale], base=s.box||s.iv, k=base.length, N=k>=7?3:2;
   const order=tun.map((m,i)=>i).sort((a,b)=>tun[a]-tun[b]);
@@ -419,7 +421,7 @@ function positions(){
   const out=[], seen=new Set();
   list.forEach(b=>{for(const sh of [-24,-12,0,12,24]){
     const fs=b.notes.map(n=>n.f+sh);
-    if(Math.min(...fs)<0||Math.max(...fs)>MAXF) continue;
+    if(Math.min(...fs)<0||Math.max(...fs)>neckF()) continue;
     const c={N:b.N,start:b.start,w:(b.w||0)+sh,notes:b.notes.map(n=>Object.assign({},n,{f:n.f+sh}))};
     const key=c.notes.map(n=>n.i+':'+n.f).sort().join(',');
     if(seen.has(key)) continue; seen.add(key); out.push(finish(c));
@@ -503,8 +505,8 @@ function renderControls(){
   const lab=st.view==='box'?[['fingers','Fingers'],['order','Play order'],['notes','Notes'],['degrees','Degrees']]:[['notes','Notes'],['degrees','Degrees']];
   seg($('labels'),lab,st.labels,v=>{st.labels=v;update();});
   $('fretField').hidden=st.view==='box';
-  if(st.frets!==12) st.frets=MAXF;
-  seg($('frets'),[[12,'0–12'],[MAXF,'0–'+MAXF]],st.frets,v=>{st.frets=v;update();});
+  if(st.frets!==12) st.frets=neckF();
+  seg($('frets'),[[12,'0–12'],[neckF(),'0–'+neckF()]],st.frets,v=>{st.frets=v;update();});
 }
 
 /* ---------- board ---------- */
@@ -519,7 +521,7 @@ function renderBoard(){
     if(st.pos<0||st.pos>=pos.length){let b=0;pos.forEach((p,i)=>{if(p.lo<pos[b].lo)b=i;});st.pos=b;}
     box=pos[st.pos];
   }
-  const maxF=box?MAXF:st.frets;
+  const maxF=box?neckF():st.frets;
   const fw=vertical?46:58, sg=vertical?36:34, pad=20, openW=vertical?42:46;
   const along=openW+maxF*fw, across=pad*2+(S-1)*sg;
   const HL=56, HT=26, VL=34, VT=30;
