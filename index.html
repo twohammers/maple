@@ -125,7 +125,8 @@ svg .octline{fill:none;stroke:var(--primary);stroke-width:4;stroke-linejoin:roun
 svg .spk{fill:none;stroke:var(--text-muted);stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
 svg .tunehead{fill:var(--text-muted);font:500 11px var(--font-ui);letter-spacing:.08em;text-transform:uppercase}
 .sw.line{width:22px;height:4px;border-radius:2px;background:var(--primary)}
-svg .tone{cursor:pointer;outline:none}
+svg .tone{cursor:pointer;outline:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+svg .tonehit{fill:transparent}
 svg .tone .sname{fill:var(--text)}
 svg .tonebg{fill:var(--surface);stroke:var(--border);stroke-width:1}
 svg .tone:hover .tonebg,svg .tone:focus-visible .tonebg{stroke:var(--primary);stroke-width:2}
@@ -490,7 +491,7 @@ function renderBoard(){
     o.push(`<line class="str" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke-width="${w.toFixed(2)}"/>`);
     const [nx,ny]=vertical?[VL+cS(i),15]:[HL-24,HT+cS(i)];
     const oct=Math.floor(m/12)-1;
-    o.push(`<g class="tone${i===playing?' playing':''}" data-tone="${i}" role="button" tabindex="0" aria-label="Play ${tName(m)}${oct} tuning pitch"><title>Tap to hear ${tName(m)}${oct}, this string's tuning pitch</title><circle class="tonebg" cx="${nx}" cy="${ny}" r="13"/><text class="sname" x="${nx}" y="${ny+0.5}" text-anchor="middle" dominant-baseline="middle">${tName(m)}</text></g>`);
+    o.push(`<g class="tone${i===playing?' playing':''}" data-tone="${i}" role="button" tabindex="0" aria-label="Play ${tName(m)}${oct} tuning pitch"><title>Tap to hear ${tName(m)}${oct}, this string's tuning pitch</title><circle class="tonehit" cx="${nx}" cy="${ny}" r="18"/><circle class="tonebg" cx="${nx}" cy="${ny}" r="13"/><text class="sname" x="${nx}" y="${ny+0.5}" text-anchor="middle" dominant-baseline="middle">${tName(m)}</text></g>`);
   });
   /* column header for the tuning-pitch buttons */
   const spk=(x,y)=>`<g transform="translate(${x},${y}) scale(.5)" aria-hidden="true"><path class="spk" d="M11 5 6 9H2v6h4l5 4V5z"/><path class="spk" d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></g>`;
@@ -565,10 +566,32 @@ function stopTone(){
   if(voice&&actx){try{const t=actx.currentTime;voice.g.gain.cancelScheduledValues(t);voice.g.gain.setTargetAtTime(0.0001,t,0.02);voice.o.stop(t+0.12);}catch(e){}}
   voice=null;
 }
+/* iPhone mutes Web Audio when the ring/silent switch is on silent. Asking for the
+   "playback" audio session (iOS 17+), or playing a silent media element alongside
+   the tone (older iOS), makes tones play like music instead of like ringtones. */
+let keepAlive=null;
+function unlockIOS(){
+  try{if(navigator.audioSession) navigator.audioSession.type='playback';}catch(e){}
+  if(keepAlive) return;
+  try{
+    const sr=8000,n=800,b=new ArrayBuffer(44+n*2),v=new DataView(b);
+    const w=(o,s)=>{for(let k=0;k<s.length;k++)v.setUint8(o+k,s.charCodeAt(k));};
+    w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+    v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+    keepAlive=new Audio(URL.createObjectURL(new Blob([b],{type:'audio/wav'})));
+    keepAlive.loop=true; keepAlive.setAttribute('playsinline','');
+  }catch(e){keepAlive=null;}
+}
 function playTone(i){
   if(playing===i&&voice){stopTone();setPlaying(null);return;}
   try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
-  if(actx.state==='suspended') actx.resume();
+  unlockIOS();
+  if(keepAlive){const p=keepAlive.play();if(p&&p.catch)p.catch(()=>{});}
+  const go=()=>startTone(i);
+  if(actx.state!=='running'){const p=actx.resume();if(p&&p.then)p.then(go,go);else go();}
+  else go();
+}
+function startTone(i){
   stopTone();
   const m=tuning()[i]; if(m===undefined) return;
   const f=440*Math.pow(2,(m-69)/12), t=actx.currentTime, dur=5;
@@ -581,7 +604,7 @@ function playTone(i){
   g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.35,t+0.008); g.gain.setTargetAtTime(0.0001,t+0.02,1.2);
   o.connect(lp).connect(g).connect(actx.destination); o.start(t); o.stop(t+dur);
   const v={o,g}; voice=v; setPlaying(i);
-  o.onended=()=>{if(voice===v){voice=null;setPlaying(null);}};
+  o.onended=()=>{if(voice===v){voice=null;setPlaying(null);if(keepAlive)keepAlive.pause();}};
 }
 $('boardWrap').addEventListener('click',e=>{const g=e.target.closest('[data-tone]');if(g)playTone(+g.dataset.tone);});
 $('boardWrap').addEventListener('keydown',e=>{const g=e.target.closest('[data-tone]');if(g&&(e.key==='Enter'||e.key===' ')){e.preventDefault();playTone(+g.dataset.tone);}});
