@@ -361,7 +361,7 @@ function fingerString(frets){
   });
   return out;
 }
-const MAXF=22;
+const MAXF=24;
 function positions(){
   const tun=tuning(), s=SC[st.scale], base=s.box||s.iv, k=base.length, N=k>=7?3:2;
   const order=tun.map((m,i)=>i).sort((a,b)=>tun[a]-tun[b]);
@@ -399,7 +399,7 @@ function positions(){
     });
     list.push({notes,lo,hi,N,start:base[p]});
   }
-  /* repeat every box an octave (12 frets) up or down so the boxes cover the whole neck to fret 22,
+  /* repeat every box an octave (12 frets) up or down so the boxes cover the whole neck to fret 24,
      then redo the fingering because a shifted box can gain or lose open strings */
   const finish=b=>{
     const nz=b.notes.filter(n=>n.f>0).map(n=>n.f);
