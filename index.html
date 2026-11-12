@@ -241,7 +241,7 @@ kbd{font:500 12px var(--font-mono);border:1px solid var(--border);border-radius:
       <div class="seg" id="frets" role="group" aria-labelledby="fretsLabel"></div>
     </div>
     <div class="field" id="posField" hidden>
-      <span class="label" id="posLabel">Position</span>
+      <span class="label" id="posLabel">Box</span>
       <div class="posbar">
         <div class="seg" id="pos" role="group" aria-labelledby="posLabel"></div>
         <span class="caption" id="posCaption"></span>
@@ -255,7 +255,7 @@ kbd{font:500 12px var(--font-mono);border:1px solid var(--border);border-radius:
   <p class="note-text" id="method"></p>
 </main>
 
-<footer><div class="wrap">Box positions: use <kbd>←</kbd> <kbd>→</kbd> to move between positions. Fingers: 1 index, 2 middle, 3 ring, 4 pinky, O open string.<div class="copy">Found a bug or have an idea? <a href="https://docs.google.com/forms/d/e/1FAIpQLSfDzDvAwSK747ohyU_8dHdVZlSy_BUF_cU7mVsIsUKw6fvhbw/viewform" target="_blank" rel="noopener">Send feedback</a>. © 2026 Derrick Chew. All rights reserved.</div></div></footer>
+<footer><div class="wrap">Boxes: use <kbd>←</kbd> <kbd>→</kbd> to move down and up the neck. Fingers: 1 index, 2 middle, 3 ring, 4 pinky, O open string.<div class="copy">Found a bug or have an idea? <a href="https://docs.google.com/forms/d/e/1FAIpQLSfDzDvAwSK747ohyU_8dHdVZlSy_BUF_cU7mVsIsUKw6fvhbw/viewform" target="_blank" rel="noopener">Send feedback</a>. © 2026 Derrick Chew. All rights reserved.</div></div></footer>
 
 <script>
 (function(){
@@ -398,7 +398,8 @@ function positions(){
     });
     list.push({notes,lo,hi,N,start:base[p]});
   }
-  return list;
+  /* number boxes by where they sit on the neck: Box 1 is closest to the nut */
+  return list.sort((a,b)=>a.lo-b.lo||a.hi-b.hi);
 }
 
 /* ---------- controls ---------- */
@@ -470,7 +471,7 @@ function renderControls(){
     b.setAttribute('aria-pressed',String(sel));b.onclick=()=>{st.root=pc;st.pos=-1;update();};r.appendChild(b);
   }
   $('scale').value=st.scale;
-  seg($('view'),[['neck','Whole neck'],['box','Box positions']],st.view,v=>{
+  seg($('view'),[['neck','Whole neck'],['box','Boxes']],st.view,v=>{
     st.view=v; if(v==='box'&&st.labels==='notes') st.labels='fingers'; if(v==='neck'&&(st.labels==='fingers'||st.labels==='order')) st.labels='notes'; update();});
   if(st.labels==='blank') st.labels=st.view==='box'?'fingers':'notes';
   const lab=st.view==='box'?[['fingers','Fingers'],['order','Play order'],['notes','Notes'],['degrees','Degrees']]:[['notes','Notes'],['degrees','Degrees']];
@@ -569,7 +570,7 @@ function renderBoard(){
       if(run.length>1&&pitchOf(run[run.length-1])===rp+12){box.octave=true;o.push(`<polyline class="octline" points="${run.map(n=>P(aN(n.f),cS(n.i)).join(',')).join(' ')}"/>`);}}
     box.notes.forEach(n=>drawNote(n,false));
   } else all.forEach(n=>drawNote(n,false));
-  const desc=`${rootName()} ${s.short} on ${inst.label}, ${box?'position '+(st.pos+1):'whole neck'}`;
+  const desc=`${rootName()} ${s.short} on ${inst.label}, ${box?'box '+(st.pos+1):'whole neck'}`;
   $('boardWrap').innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${desc}">${o.join('')}</svg>`;
 
   $('posField').hidden=!box;
@@ -583,9 +584,9 @@ function renderBoard(){
     (box?`<span><i class="sw b"></i>Current box</span><span style="opacity:.8">Faint dots: the rest of the scale</span>`:'')+
     `<span><svg class="speaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>Tap a string name to hear its tuning pitch</span>`;
   $('method').textContent=box
-    ? (box.N===0?'This instrument uses one-finger-per-fret windows: one position starts on each scale note of the lowest string, and each finger covers one fret.':box.N===3?'Seven-note scales use the three-notes-per-string system: one position starts on each scale degree of the lowest string.':'Pentatonic scales use two-notes-per-string boxes: one position starts on each scale note of the lowest string.')
+    ? 'Boxes are numbered from the nut up: Box 1 is the one closest to the nut. '+(box.N===0?'Each box is a one-finger-per-fret window, so each finger covers one fret.':box.N===3?'Seven-note scales use three notes per string.':'Pentatonic scales use two notes per string.')
       +' Finger numbers are a common default, not a rule; change them if your hand prefers a different stretch.'+(st.labels==='order'?' Play order numbers the box from its lowest note to its highest: play 1, 2, 3… up, then back down.':'')
-    : 'Every note of the scale across the neck. Switch to Box positions to learn it one shape at a time.';
+    : 'Every note of the scale across the neck. Switch to Boxes to learn it one shape at a time.';
 }
 
 function renderBanner(){
